@@ -78,22 +78,23 @@ pub fn pos_parser(input: &mut &str) -> ModalResult<u16> {
 
 pub fn range_parser(input: &mut &str) -> ModalResult<(u16, u16)> {
     seq!(_: "{", _: space0, digit1,_: ",", digit1, _: space0, _: "}")
-        .map(|(start, end): (&str, &str)| (start.parse().unwrap(), end.parse().unwrap()))
+        .try_map(|(start, end): (&str, &str)| {
+            start.parse().and_then(|s| end.parse().map(|e| (s, e)))
+        })
         .parse_next(input)
 }
 
 pub fn dynamic_base_parser(input: &mut &str) -> ModalResult<Dynamic> {
     alt((
         seq!(
-            take_while(1.., |ch:char| "fmp".contains(ch)).map(|d| match d {
-                "ff" => DynamicLevel::FF,
-                "f" => DynamicLevel::F,
-                "mf" => DynamicLevel::MF,
-                "mp" => DynamicLevel::MP,
-                "p" => DynamicLevel::P,
-                "pp" => DynamicLevel::PP,
-                _ => panic!("invalid dynamic"), // FIXME: error handling
-            }),
+            alt((
+                "ff".map(|_| DynamicLevel::FF),
+                "f" .map(|_| DynamicLevel::F),
+                "mf".map(|_| DynamicLevel::MF),
+                "mp".map(|_| DynamicLevel::MP),
+                "p" .map(|_| DynamicLevel::P),
+                "pp".map(|_| DynamicLevel::PP),
+            )),
             _: space0,
             pos_parser
         )
