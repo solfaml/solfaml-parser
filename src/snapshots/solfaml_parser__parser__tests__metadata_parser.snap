@@ -1,0 +1,28 @@
+---
+source: src/parser.rs
+expression: metadata
+---
+Ok(
+    [
+        (
+            "title",
+            "foo",
+        ),
+        (
+            "author",
+            "bar",
+        ),
+        (
+            "time",
+            "4/4",
+        ),
+        (
+            "key",
+            "C",
+        ),
+        (
+            "description",
+            "Hello World!",
+        ),
+    ],
+)

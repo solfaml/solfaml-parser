@@ -1,0 +1,141 @@
+---
+source: src/parser.rs
+expression: notes
+---
+[
+    Ok(
+        Note {
+            base: D,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: R,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: M,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: F,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: S,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: L,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: T,
+            variant: Base,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: D,
+            variant: Base,
+            octave: Up(
+                1,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: R,
+            variant: Base,
+            octave: Down(
+                1,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: M,
+            variant: Base,
+            octave: Up(
+                2,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: F,
+            variant: Base,
+            octave: Down(
+                2,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: T,
+            variant: Raised,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: D,
+            variant: Lowered,
+            octave: Base,
+        },
+    ),
+    Ok(
+        Note {
+            base: R,
+            variant: Raised,
+            octave: Up(
+                1,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: M,
+            variant: Lowered,
+            octave: Down(
+                1,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: S,
+            variant: Raised,
+            octave: Up(
+                1,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: R,
+            variant: Lowered,
+            octave: Down(
+                3,
+            ),
+        },
+    ),
+]

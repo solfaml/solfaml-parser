@@ -1,0 +1,51 @@
+---
+source: src/parser.rs
+expression: lyrics
+---
+Ok(
+    LyricsTree {
+        prefix: "1.",
+        root: Join(
+            Chunk(
+                Space(
+                    String(
+                        "do",
+                    ),
+                    Concat(
+                        String(
+                            "re",
+                        ),
+                        String(
+                            "mi",
+                        ),
+                    ),
+                ),
+            ),
+            Concat(
+                Chunk(
+                    Space(
+                        String(
+                            "fasola",
+                        ),
+                        Split(
+                            String(
+                                "ti",
+                            ),
+                            String(
+                                "e",
+                            ),
+                        ),
+                    ),
+                ),
+                Chunk(
+                    Space(
+                        String(
+                            "do",
+                        ),
+                        Placeholder,
+                    ),
+                ),
+            ),
+        ),
+    },
+)

@@ -1,7 +1,7 @@
 use super::ast::*;
 
 use winnow::{
-    ascii::{alphanumeric1, digit1, multispace0, multispace1, space0},
+    ascii::{alphanumeric1, digit1, multispace0, multispace1, space0, space1},
     combinator::{alt, delimited, not, opt, separated, seq},
     prelude::*,
     token::{one_of, take_while},
@@ -42,6 +42,8 @@ pub fn metadata_parser(input: &mut &str) -> ModalResult<Vec<(String, String)>> {
 pub fn staff_parser(input: &mut &str) -> ModalResult<Staff> {
     seq! {
         Staff {
+            dynamics: dynamics_parser,
+            _: opt(seq!("|", take_while(1.., |ch: char| ch == '-'), alt(("||", "|")), "\n")),
             first: measure_parser,
             _: "\n",
             second: measure_parser,
@@ -55,10 +57,59 @@ pub fn staff_parser(input: &mut &str) -> ModalResult<Staff> {
     .parse_next(input)
 }
 
+pub fn dynamics_parser(input: &mut &str) -> ModalResult<Vec<Dynamic>> {
+    seq!(
+        opt("|:"),
+        _: space0,
+        separated(0.., dynamic_base_parser, space1),
+        _: space0,
+        _: opt(alt(("||", "|"))),
+        _: opt("\n"),
+    )
+    .map(|(prefix, e)| prefix.map(|_| e).unwrap_or_default())
+    .parse_next(input)
+}
+
+pub fn pos_parser(input: &mut &str) -> ModalResult<u16> {
+    seq!(_: "{", _: space0, digit1, _: space0, _: "}")
+        .try_map(|(pos,): (&str,)| pos.parse())
+        .parse_next(input)
+}
+
+pub fn range_parser(input: &mut &str) -> ModalResult<(u16, u16)> {
+    seq!(_: "{", _: space0, digit1,_: ",", digit1, _: space0, _: "}")
+        .map(|(start, end): (&str, &str)| (start.parse().unwrap(), end.parse().unwrap()))
+        .parse_next(input)
+}
+
+pub fn dynamic_base_parser(input: &mut &str) -> ModalResult<Dynamic> {
+    alt((
+        seq!(
+            take_while(1.., |ch:char| "fmp".contains(ch)).map(|d| match d {
+                "ff" => DynamicLevel::FF,
+                "f" => DynamicLevel::F,
+                "mf" => DynamicLevel::MF,
+                "mp" => DynamicLevel::MP,
+                "p" => DynamicLevel::P,
+                "pp" => DynamicLevel::PP,
+                _ => panic!("invalid dynamic"), // FIXME: error handling
+            }),
+            _: space0,
+            pos_parser
+        )
+        .map(|(kind, pos)| Dynamic::Level { kind, pos }),
+        seq!(_: "^", _: space0, pos_parser).map(|(pos,)| Dynamic::Accent { pos }),
+        seq!(_: "<", _: space0, range_parser)
+            .map(|((start, end),)| Dynamic::Crescendo { start, end }),
+        seq!(_: ">", _: space0, range_parser)
+            .map(|((start, end),)| Dynamic::Decrescendo { start, end }),
+    ))
+    .parse_next(input)
+}
+
 pub fn base_lyrics_parser(input: &mut &str) -> ModalResult<LyricsChunk> {
     seq!(
-        _: space0,
-        take_while(1.., |ch: char| !" _<|$\n".contains(ch)),
+        take_while(1.., |ch: char| !" _<|$\n%".contains(ch)),
         opt(seq!(_: "$", base_lyrics_parser)),
     )
     .map(|(lhs, rhs)| {
@@ -74,7 +125,7 @@ pub fn base_lyrics_parser(input: &mut &str) -> ModalResult<LyricsChunk> {
 pub fn lyrics_chunk_parser(input: &mut &str) -> ModalResult<LyricsChunk> {
     seq!(
         _: space0,
-        base_lyrics_parser,
+        alt((base_lyrics_parser, "%".map(|_| LyricsChunk::Placeholder))),
         opt(seq!(one_of((' ', '_')), lyrics_chunk_parser)),
         _: space0,
     )
@@ -133,8 +184,12 @@ pub fn measure_parser(input: &mut &str) -> ModalResult<Vec<Measure>> {
 pub fn octave_parser(input: &mut &str) -> ModalResult<Octave> {
     alt((
         "'".map(|_| Octave::Up(1)),
-        seq!(_: "+", digit1).map(|(d,): (&str,)| Octave::Up(d.parse().unwrap())),
-        seq!(_: "-", digit1).map(|(d,): (&str,)| Octave::Down(d.parse().unwrap())),
+        seq!(_: "+", digit1)
+            .try_map(|(d,): (&str,)| d.parse())
+            .map(|d| Octave::Up(d)),
+        seq!(_: "-", digit1)
+            .try_map(|(d,): (&str,)| d.parse())
+            .map(|d| Octave::Down(d)),
         seq!(_: ",", not(normal_div_parser)).map(|_| Octave::Down(1)),
     ))
     .parse_next(input)
@@ -159,7 +214,7 @@ pub fn note_parser(input: &mut &str) -> ModalResult<Note> {
     seq! {
         Note {
             base: base_note_parser,
-            variation: opt(one_of(('a', 'i'))).map(|v| match v {
+            variant: opt(one_of(('a', 'i'))).map(|v| match v {
                 Some('a') => NoteVariant::Lowered,
                 Some('i') => NoteVariant::Raised,
                 _ => NoteVariant::Base,
@@ -176,7 +231,6 @@ pub fn base_beat_parser(input: &mut &str) -> ModalResult<Measure> {
         alt((
             "-".map(|_| Measure::EmptyNote),
             note_parser.map(Measure::Note),
-            delimited("(", note_parser, ")").map(Measure::EmphasedNote),
             delimited("_", normal_div_parser, "_").map(|b| Measure::UnderlinedMeasure(b.into())),
         )),
         _: space0,
@@ -222,11 +276,66 @@ pub fn normal_div_parser(input: &mut &str) -> ModalResult<Measure> {
 mod tests {
     use winnow::Parser;
 
-    use crate::parser::solfa_parser;
+    use crate::parser::{
+        dynamics_parser, lyrics_tree_parser, measure_parser, metadata_parser, note_parser,
+        solfa_parser,
+    };
 
     #[test]
-    fn test_simple_parsing() {
-        let mut source = "
+    fn test_metadata_parser() {
+        let source = "title: foo
+author: bar
+time: 4/4
+key: C
+description: Hello World!";
+
+        let metadata = metadata_parser.parse(source);
+
+        insta::assert_debug_snapshot!(metadata);
+    }
+
+    #[test]
+    fn test_dynamics_parsing() {
+        let source = "|: f{1} <{3,7} ^{8} mp{10} ||";
+        let dynamics = dynamics_parser.parse(source).unwrap();
+
+        insta::assert_debug_snapshot!(dynamics);
+    }
+
+    #[test]
+    fn test_note_parsing() {
+        let source = [
+            "d", "r", "m", "f", "s", "l", "t", "d'", "r,", "m+2", "f-2", "ti", "da", "ri'", "ma,",
+            "si+1", "ra-3",
+        ];
+
+        let notes = source
+            .into_iter()
+            .map(|s| note_parser.parse(s))
+            .collect::<Vec<_>>();
+
+        insta::assert_debug_snapshot!(notes);
+    }
+
+    #[test]
+    fn test_measure_parsing() {
+        let source = "| d : r .  m , f  | s : _l . t_ , - ||";
+        let measure = measure_parser.parse(source);
+
+        insta::assert_debug_snapshot!(measure);
+    }
+
+    #[test]
+    fn test_lyrics_parsing() {
+        let source = "1. do re_mi | fasola ti$e <|> do % ||";
+        let lyrics = lyrics_tree_parser.parse(source);
+
+        insta::assert_debug_snapshot!(lyrics);
+    }
+
+    #[test]
+    fn test_full_parsing() {
+        let source = "
 title: foo
 author: bar
 time: 4/4
@@ -235,23 +344,19 @@ description: Hello World!
 
 ---
 
-| d : r : m | f . s , l : (t) | _d'_ ||
-| d : r : m | f . s , l : (t) | _d'_ ||
-| d : r : m | f . s , l : (t) | _d'_ ||
-| d : r : m | f . s , l : (t) |  d,  ||
- 
-1. do re mi | fa_so la ti$e  <|> do  ||
-2. do re mi | fa_so la ti$e  <|> do  ||
+|: p{1}       <{4,7}             ^{8}        ||
+|--------------------------------------------||
+| d : r : m | f . s , l :  t   | _d'_ : ri+2 ||
+| d : r : m | f . s , l :  t   | _d'_ : ri+2 ||
+| d : r : m | f . s , l :  t   | _d'_ : ra-1 ||
+| d : r : m | f . s , l :  t   |  d,  : ra-1 ||
+
+1. do re_mi |   fasola   ti$e <|> do     re  ||
+2. do re_mi |   fasola   ti$e <|> do     %   ||
 ";
 
-        let res = solfa_parser.parse(&mut source).unwrap();
+        let solfa = solfa_parser.parse(source).unwrap();
 
-        assert_eq!(&res.header["title"], "foo");
-        assert_eq!(&res.header["time"], "4/4");
-        assert_eq!(&res.header["description"], "Hello World!");
-
-        let first_staff = &res.staffs[0];
-
-        assert_eq!(first_staff.lyrics.len(), 2);
+        insta::assert_debug_snapshot!(solfa.staffs);
     }
 }

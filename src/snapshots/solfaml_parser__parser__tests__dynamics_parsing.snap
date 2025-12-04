@@ -1,0 +1,21 @@
+---
+source: src/parser.rs
+expression: dynamics
+---
+[
+    Level {
+        pos: 1,
+        kind: F,
+    },
+    Crescendo {
+        start: 3,
+        end: 7,
+    },
+    Accent {
+        pos: 8,
+    },
+    Level {
+        pos: 10,
+        kind: MP,
+    },
+]

@@ -1,0 +1,90 @@
+---
+source: src/parser.rs
+expression: measure
+---
+Ok(
+    [
+        BeatDivision(
+            BeatDivision {
+                lhs: Note(
+                    Note {
+                        base: D,
+                        variant: Base,
+                        octave: Base,
+                    },
+                ),
+                rhs: BeatDivision(
+                    BeatDivision {
+                        lhs: Note(
+                            Note {
+                                base: R,
+                                variant: Base,
+                                octave: Base,
+                            },
+                        ),
+                        rhs: BeatDivision(
+                            BeatDivision {
+                                lhs: Note(
+                                    Note {
+                                        base: M,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                rhs: Note(
+                                    Note {
+                                        base: F,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                kind: Quarter,
+                            },
+                        ),
+                        kind: Half,
+                    },
+                ),
+                kind: Normal,
+            },
+        ),
+        BeatDivision(
+            BeatDivision {
+                lhs: Note(
+                    Note {
+                        base: S,
+                        variant: Base,
+                        octave: Base,
+                    },
+                ),
+                rhs: BeatDivision(
+                    BeatDivision {
+                        lhs: UnderlinedMeasure(
+                            BeatDivision(
+                                BeatDivision {
+                                    lhs: Note(
+                                        Note {
+                                            base: L,
+                                            variant: Base,
+                                            octave: Base,
+                                        },
+                                    ),
+                                    rhs: Note(
+                                        Note {
+                                            base: T,
+                                            variant: Base,
+                                            octave: Base,
+                                        },
+                                    ),
+                                    kind: Half,
+                                },
+                            ),
+                        ),
+                        rhs: EmptyNote,
+                        kind: Quarter,
+                    },
+                ),
+                kind: Normal,
+            },
+        ),
+    ],
+)
