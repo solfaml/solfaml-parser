@@ -186,10 +186,10 @@ pub fn octave_parser(input: &mut &str) -> ModalResult<Octave> {
         "'".map(|_| Octave::Up(1)),
         seq!(_: "+", digit1)
             .try_map(|(d,): (&str,)| d.parse())
-            .map(|d| Octave::Up(d)),
+            .map(Octave::Up),
         seq!(_: "-", digit1)
             .try_map(|(d,): (&str,)| d.parse())
-            .map(|d| Octave::Down(d)),
+            .map(Octave::Down),
         seq!(_: ",", not(normal_div_parser)).map(|_| Octave::Down(1)),
     ))
     .parse_next(input)
