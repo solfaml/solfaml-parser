@@ -131,6 +131,8 @@ pub fn dynamic_base_parser(input: &mut &str) -> ModalResult<Dynamic> {
     alt((
         dynamic_level_parser,
         seq!(_: "DC", _: space0, pos_parser).map(|(pos,)| Dynamic::DC { pos }),
+        seq!(_: "DS", _: space0, pos_parser).map(|(pos,)| Dynamic::DS { pos }),
+        seq!(_: "$", _: space0, pos_parser).map(|(pos,)| Dynamic::Sign { pos }),
         seq!(_: "^", _: space0, pos_parser).map(|(pos,)| Dynamic::Accent { pos }),
         seq!(_: "<", _: space0, range_parser)
             .map(|((start, end),)| Dynamic::Crescendo { start, end }),
@@ -218,11 +220,22 @@ pub fn measure_parser(input: &mut &str) -> ModalResult<Vec<Measure>> {
     seq!(
         _: multispace0,
         _: opt("|"),
-        separated(1.., normal_div_parser, "|"),
+        separated(1.., measure_base_parser, "|"),
         _: alt(("||", "|")),
     )
     .map(|(m,)| m)
     .parse_next(input)
+}
+
+pub fn measure_base_parser(input: &mut &str) -> ModalResult<Measure> {
+    seq!(opt(":"), normal_div_parser, opt(":"),)
+        .map(|(rep_start, measure, rep_end)| match (rep_start, rep_end) {
+            (Some(_), Some(_)) => Measure::Repeated(measure.into()),
+            (Some(_), None) => Measure::RepeatStart(measure.into()),
+            (None, Some(_)) => Measure::RepeatEnd(measure.into()),
+            (None, None) => measure,
+        })
+        .parse_next(input)
 }
 
 pub fn octave_parser(input: &mut &str) -> ModalResult<Octave> {
@@ -433,6 +446,21 @@ description: Hello World!";
 | s : l | t : - ||
 
 > so la | ti
+";
+
+        let result = solfa_parser.parse(source);
+
+        insta::assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn test_measure_repetition_parsing() {
+        let source = "
+---
+| d : r |: m : f | s : l :| t : d' ||
+| d : r |: m : f | s : l :| t : d' ||
+| d : r |: m : f | s : l :| t : d' ||
+| d : r |: m : f | s : l :| t : d' ||
 ";
 
         let result = solfa_parser.parse(source);

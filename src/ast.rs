@@ -8,11 +8,13 @@ pub struct Solfa {
 
 #[derive(Debug, PartialEq)]
 pub enum Dynamic {
-    Level { pos: u16, kind: DynamicLevel },
+    DC { pos: u16 },
+    DS { pos: u16 },
+    Sign { pos: u16 },
     Accent { pos: u16 },
     Crescendo { start: u16, end: u16 },
     Decrescendo { start: u16, end: u16 },
-    DC { pos: u16 },
+    Level { pos: u16, kind: DynamicLevel },
 }
 
 #[derive(Debug, PartialEq)]
@@ -101,6 +103,9 @@ pub enum Measure {
     Note(Note),
     BeatDivision(BeatDivision),
     UnderlinedMeasure(Box<Measure>),
+    Repeated(Box<Measure>),
+    RepeatStart(Box<Measure>),
+    RepeatEnd(Box<Measure>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -115,7 +120,7 @@ impl From<StaffPartial> for Staff {
         let measures = value
             .voice1
             .into_iter()
-            .zip(value.voice2) // FIXME: Error handling
+            .zip(value.voice2) // FIXME: Error handling and validation
             .zip(value.voice3)
             .zip(value.voice4)
             .map(|(((m1, m2), m3), m4)| [m1, m2, m3, m4])
