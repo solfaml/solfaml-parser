@@ -15,8 +15,10 @@ Ok(
                         String(
                             "re",
                         ),
-                        String(
-                            "mi",
+                        NewLineSuffixed(
+                            String(
+                                "mi",
+                            ),
                         ),
                     ),
                 ),

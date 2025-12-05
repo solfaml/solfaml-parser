@@ -14,7 +14,7 @@ pub fn solfa_parser(input: &mut &str) -> ModalResult<Solfa> {
             header: metadata_parser.map(|metadata| {
                 metadata.into_iter().collect()
             }),
-            _: multispace1,
+            _: multispace0,
             _: "---",
             _: multispace1,
             staffs: separated(1.., staff_parser, multispace1),
@@ -39,24 +39,6 @@ pub fn metadata_parser(input: &mut &str) -> ModalResult<Vec<(String, String)>> {
     .parse_next(input)
 }
 
-pub fn staff_parser(input: &mut &str) -> ModalResult<Staff> {
-    seq! {
-        Staff {
-            dynamics: dynamics_parser,
-            _: opt(seq!("|", take_while(1.., |ch: char| ch == '-'), alt(("||", "|")), "\n")),
-            first: measure_parser,
-            _: "\n",
-            second: measure_parser,
-            _: "\n",
-            third: measure_parser,
-            _: "\n",
-            fourth: measure_parser,
-            lyrics: separated(0.., seq!(_: multispace0, lyrics_tree_parser).map(|(l,)| l), multispace1)
-        }
-    }
-    .parse_next(input)
-}
-
 pub fn dynamics_parser(input: &mut &str) -> ModalResult<Vec<Dynamic>> {
     seq!(
         opt("|:"),
@@ -67,6 +49,48 @@ pub fn dynamics_parser(input: &mut &str) -> ModalResult<Vec<Dynamic>> {
         _: opt("\n"),
     )
     .map(|(prefix, e)| prefix.map(|_| e).unwrap_or_default())
+    .parse_next(input)
+}
+
+pub fn staff_parser(input: &mut &str) -> ModalResult<Staff> {
+    seq! {
+        StaffPartial {
+            dynamics: dynamics_parser,
+            _: opt(staff_bar_parser),
+            voice1: measure_parser,
+            lyrics1: opt(lyrics_parser),
+            voice2: measure_parser,
+            lyrics2: opt(lyrics_parser),
+            voice3: measure_parser,
+            lyrics3: opt(lyrics_parser),
+            voice4: measure_parser,
+            lyrics4: opt(lyrics_parser),
+        }
+    }
+    .map(Staff::from)
+    .parse_next(input)
+}
+
+pub fn staff_bar_parser(input: &mut &str) -> ModalResult<()> {
+    seq!(
+        _: "|",
+        _: take_while(1.., |ch: char| ch == '-'),
+        _: alt(("||", "|")),
+        _: "\n"
+    )
+    .parse_next(input)
+}
+
+pub fn lyrics_parser(input: &mut &str) -> ModalResult<Vec<LyricsTree>> {
+    separated(
+        1..,
+        seq!(
+            _: multispace0,
+            lyrics_tree_parser,
+        )
+        .map(|(l,)| l),
+        multispace1,
+    )
     .parse_next(input)
 }
 
@@ -84,21 +108,29 @@ pub fn range_parser(input: &mut &str) -> ModalResult<(u16, u16)> {
         .parse_next(input)
 }
 
+pub fn dynamic_level_parser(input: &mut &str) -> ModalResult<Dynamic> {
+    seq!(
+        alt((
+            "fff".map(|_| DynamicLevel::FFF),
+            "ff".map(|_| DynamicLevel::FF),
+            "f" .map(|_| DynamicLevel::F),
+            "mf".map(|_| DynamicLevel::MF),
+            "mp".map(|_| DynamicLevel::MP),
+            "p" .map(|_| DynamicLevel::P),
+            "pp".map(|_| DynamicLevel::PP),
+            "ppp".map(|_| DynamicLevel::PPP),
+        )),
+        _: space0,
+        pos_parser
+    )
+    .map(|(kind, pos)| Dynamic::Level { kind, pos })
+    .parse_next(input)
+}
+
 pub fn dynamic_base_parser(input: &mut &str) -> ModalResult<Dynamic> {
     alt((
-        seq!(
-            alt((
-                "ff".map(|_| DynamicLevel::FF),
-                "f" .map(|_| DynamicLevel::F),
-                "mf".map(|_| DynamicLevel::MF),
-                "mp".map(|_| DynamicLevel::MP),
-                "p" .map(|_| DynamicLevel::P),
-                "pp".map(|_| DynamicLevel::PP),
-            )),
-            _: space0,
-            pos_parser
-        )
-        .map(|(kind, pos)| Dynamic::Level { kind, pos }),
+        dynamic_level_parser,
+        seq!(_: "DC", _: space0, pos_parser).map(|(pos,)| Dynamic::DC { pos }),
         seq!(_: "^", _: space0, pos_parser).map(|(pos,)| Dynamic::Accent { pos }),
         seq!(_: "<", _: space0, range_parser)
             .map(|((start, end),)| Dynamic::Crescendo { start, end }),
@@ -110,15 +142,25 @@ pub fn dynamic_base_parser(input: &mut &str) -> ModalResult<Dynamic> {
 
 pub fn base_lyrics_parser(input: &mut &str) -> ModalResult<LyricsChunk> {
     seq!(
-        take_while(1.., |ch: char| !" _<|$\n%".contains(ch)),
-        opt(seq!(_: "$", base_lyrics_parser)),
+        alt((
+            "%".map(|_| LyricsChunk::Placeholder),
+            seq!(
+                take_while(1.., |ch: char| !" _<|$\n%\\".contains(ch)),
+                opt(seq!(_: "$", base_lyrics_parser)),
+            )
+            .map(|(lhs, rhs)| {
+                let lhs = LyricsChunk::String(lhs.to_string());
+                match rhs {
+                    Some((rhs,)) => LyricsChunk::Split(Box::new(lhs), Box::new(rhs)),
+                    None => lhs,
+                }
+            }),
+        )),
+        opt("\\")
     )
-    .map(|(lhs, rhs)| {
-        let lhs = LyricsChunk::String(lhs.to_string());
-        match rhs {
-            Some((rhs,)) => LyricsChunk::Split(Box::new(lhs), Box::new(rhs)),
-            None => lhs,
-        }
+    .map(|(lyrics, newline)| match newline.is_some() {
+        false => lyrics,
+        true => LyricsChunk::NewLineSuffixed(Box::new(lyrics)),
     })
     .parse_next(input)
 }
@@ -126,7 +168,7 @@ pub fn base_lyrics_parser(input: &mut &str) -> ModalResult<LyricsChunk> {
 pub fn lyrics_chunk_parser(input: &mut &str) -> ModalResult<LyricsChunk> {
     seq!(
         _: space0,
-        alt((base_lyrics_parser, "%".map(|_| LyricsChunk::Placeholder))),
+        base_lyrics_parser,
         opt(seq!(one_of((' ', '_')), lyrics_chunk_parser)),
         _: space0,
     )
@@ -166,7 +208,7 @@ pub fn lyrics_tree_parser(input: &mut &str) -> ModalResult<LyricsTree> {
             prefix: take_while(1.., |ch: char| !" |".contains(ch))
                 .map(|s: &str| s.to_string()),
             root: lyrics_measure_parser,
-            _: alt(("||", "|")),
+            _: opt(alt(("||", "|"))),
         }
     }
     .parse_next(input)
@@ -174,6 +216,7 @@ pub fn lyrics_tree_parser(input: &mut &str) -> ModalResult<LyricsTree> {
 
 pub fn measure_parser(input: &mut &str) -> ModalResult<Vec<Measure>> {
     seq!(
+        _: multispace0,
         _: opt("|"),
         separated(1.., normal_div_parser, "|"),
         _: alt(("||", "|")),
@@ -328,10 +371,69 @@ description: Hello World!";
 
     #[test]
     fn test_lyrics_parsing() {
-        let source = "1. do re_mi | fasola ti$e <|> do % ||";
+        let source = "1. do re_mi\\ | fasola ti$e <|> do % ||";
         let lyrics = lyrics_tree_parser.parse(source);
 
         insta::assert_debug_snapshot!(lyrics);
+    }
+
+    #[test]
+    fn test_simple_solfa_parsing() {
+        let source = "
+---
+| d : r | m : f ||
+| d : r | m : f ||
+| d : r | m : f ||
+| d : r | m : f ||
+";
+
+        let result = solfa_parser.parse(source);
+
+        insta::assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn test_per_voice_lyrics_parsing() {
+        let source = "
+---
+| d : r ||
+| d : r ||
+> do re
+| d : r ||
+| d : r ||
+> doo ree
+";
+
+        let result = solfa_parser.parse(source);
+
+        insta::assert_debug_snapshot!(result);
+    }
+
+    #[test]
+    fn test_multi_staff_parsing() {
+        let source = "
+---
+| d : r | m : f ||
+| d : r | m : f ||
+| d : r | m : f ||
+| d : r | m : f ||
+
+> do re | mi fa
+
+| s : l | t : d' ||
+| s : l | t : d' ||
+
+> so la | ti do
+
+| s : l | t : - ||
+| s : l | t : - ||
+
+> so la | ti
+";
+
+        let result = solfa_parser.parse(source);
+
+        insta::assert_debug_snapshot!(result);
     }
 
     #[test]
@@ -345,15 +447,15 @@ description: Hello World!
 
 ---
 
-|: p{1}       <{4,7}             ^{8}        ||
-|--------------------------------------------||
-| d : r : m | f . s , l :  t   | _d'_ : ri+2 ||
-| d : r : m | f . s , l :  t   | _d'_ : ri+2 ||
-| d : r : m | f . s , l :  t   | _d'_ : ra-1 ||
-| d : r : m | f . s , l :  t   |  d,  : ra-1 ||
+|: p{1}       <{4,7}             ^{8}   DC{9} ||
+|---------------------------------------------||
+| d : r : m | f . s , l :  t   | _d'_ : ri+2  ||
+| d : r : m | f . s , l :  t   | _d'_ : ri+2  ||
+| d : r : m | f . s , l :  t   | _d'_ : ra-1  ||
+| d : r : m | f . s , l :  t   |  d,  : ra-1  ||
 
-1. do re_mi |   fasola   ti$e <|> do     re  ||
-2. do re_mi |   fasola   ti$e <|> do     %   ||
+1. do re_mi |   fasola   ti$e <|> do     re   ||
+2. do re_mi |   fasola   ti$e <|> do     %    ||
 ";
 
         let solfa = solfa_parser.parse(source).unwrap();

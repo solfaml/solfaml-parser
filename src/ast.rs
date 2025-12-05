@@ -12,16 +12,19 @@ pub enum Dynamic {
     Accent { pos: u16 },
     Crescendo { start: u16, end: u16 },
     Decrescendo { start: u16, end: u16 },
+    DC { pos: u16 },
 }
 
 #[derive(Debug, PartialEq)]
 pub enum DynamicLevel {
+    FFF,
     FF,
     F,
     MF,
     MP,
     P,
     PP,
+    PPP,
 }
 
 #[derive(Debug, PartialEq)]
@@ -103,17 +106,54 @@ pub enum Measure {
 #[derive(Debug, PartialEq)]
 pub struct Staff {
     pub dynamics: Vec<Dynamic>,
-    pub first: Vec<Measure>,
-    pub second: Vec<Measure>,
-    pub third: Vec<Measure>,
-    pub fourth: Vec<Measure>,
-    pub lyrics: Vec<LyricsTree>,
+    pub measures: Vec<[Measure; 4]>,
+    pub lyrics: Vec<IndexedLyricsSet>,
+}
+
+impl From<StaffPartial> for Staff {
+    fn from(value: StaffPartial) -> Self {
+        let measures = value
+            .voice1
+            .into_iter()
+            .zip(value.voice2) // FIXME: Error handling
+            .zip(value.voice3)
+            .zip(value.voice4)
+            .map(|(((m1, m2), m3), m4)| [m1, m2, m3, m4])
+            .collect();
+
+        let lyrics = vec![
+            value.lyrics1.map(|l| IndexedLyricsSet::from((0, l))),
+            value.lyrics2.map(|l| IndexedLyricsSet::from((1, l))),
+            value.lyrics3.map(|l| IndexedLyricsSet::from((2, l))),
+            value.lyrics4.map(|l| IndexedLyricsSet::from((3, l))),
+        ];
+
+        Self {
+            dynamics: value.dynamics,
+            lyrics: lyrics.into_iter().flatten().collect(),
+            measures,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StaffPartial {
+    pub dynamics: Vec<Dynamic>,
+    pub voice1: Vec<Measure>,
+    pub lyrics1: Option<Vec<LyricsTree>>,
+    pub voice2: Vec<Measure>,
+    pub lyrics2: Option<Vec<LyricsTree>>,
+    pub voice3: Vec<Measure>,
+    pub lyrics3: Option<Vec<LyricsTree>>,
+    pub voice4: Vec<Measure>,
+    pub lyrics4: Option<Vec<LyricsTree>>,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum LyricsChunk {
     Placeholder,
     String(String),
+    NewLineSuffixed(Box<LyricsChunk>),
     Split(Box<LyricsChunk>, Box<LyricsChunk>),
     Space(Box<LyricsChunk>, Box<LyricsChunk>),
     Concat(Box<LyricsChunk>, Box<LyricsChunk>),
@@ -130,4 +170,16 @@ pub enum LyricsMeasure {
 pub struct LyricsTree {
     pub prefix: String,
     pub root: LyricsMeasure,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IndexedLyricsSet {
+    pub index: u8,
+    pub lyrics: Vec<LyricsTree>,
+}
+
+impl From<(u8, Vec<LyricsTree>)> for IndexedLyricsSet {
+    fn from((index, lyrics): (u8, Vec<LyricsTree>)) -> Self {
+        Self { index, lyrics }
+    }
 }

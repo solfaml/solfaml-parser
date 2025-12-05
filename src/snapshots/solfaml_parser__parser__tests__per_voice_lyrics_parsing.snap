@@ -1,0 +1,132 @@
+---
+source: src/parser.rs
+expression: result
+---
+Ok(
+    Solfa {
+        header: {},
+        staffs: [
+            Staff {
+                dynamics: [],
+                measures: [
+                    [
+                        BeatDivision(
+                            BeatDivision {
+                                lhs: Note(
+                                    Note {
+                                        base: D,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                rhs: Note(
+                                    Note {
+                                        base: R,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                kind: Normal,
+                            },
+                        ),
+                        BeatDivision(
+                            BeatDivision {
+                                lhs: Note(
+                                    Note {
+                                        base: D,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                rhs: Note(
+                                    Note {
+                                        base: R,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                kind: Normal,
+                            },
+                        ),
+                        BeatDivision(
+                            BeatDivision {
+                                lhs: Note(
+                                    Note {
+                                        base: D,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                rhs: Note(
+                                    Note {
+                                        base: R,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                kind: Normal,
+                            },
+                        ),
+                        BeatDivision(
+                            BeatDivision {
+                                lhs: Note(
+                                    Note {
+                                        base: D,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                rhs: Note(
+                                    Note {
+                                        base: R,
+                                        variant: Base,
+                                        octave: Base,
+                                    },
+                                ),
+                                kind: Normal,
+                            },
+                        ),
+                    ],
+                ],
+                lyrics: [
+                    IndexedLyricsSet {
+                        index: 1,
+                        lyrics: [
+                            LyricsTree {
+                                prefix: ">",
+                                root: Chunk(
+                                    Space(
+                                        String(
+                                            "do",
+                                        ),
+                                        String(
+                                            "re",
+                                        ),
+                                    ),
+                                ),
+                            },
+                        ],
+                    },
+                    IndexedLyricsSet {
+                        index: 3,
+                        lyrics: [
+                            LyricsTree {
+                                prefix: ">",
+                                root: Chunk(
+                                    Space(
+                                        String(
+                                            "doo",
+                                        ),
+                                        String(
+                                            "ree",
+                                        ),
+                                    ),
+                                ),
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+)
