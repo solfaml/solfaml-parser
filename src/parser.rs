@@ -2,7 +2,7 @@ use super::ast::*;
 
 use winnow::{
     ascii::{alphanumeric1, digit1, multispace0, multispace1, space0, space1},
-    combinator::{alt, delimited, not, opt, separated, seq},
+    combinator::{alt, delimited, not, opt, repeat, separated, seq},
     prelude::*,
     token::{one_of, take_while},
 };
@@ -227,14 +227,18 @@ pub fn measure_parser(input: &mut &str) -> ModalResult<Vec<Measure>> {
 
 pub fn octave_parser(input: &mut &str) -> ModalResult<Octave> {
     alt((
-        "'".map(|_| Octave::Up(1)),
         seq!(_: "+", digit1)
             .try_map(|(d,): (&str,)| d.parse())
             .map(Octave::Up),
         seq!(_: "-", digit1)
             .try_map(|(d,): (&str,)| d.parse())
             .map(Octave::Down),
-        seq!(_: ",", not(normal_div_parser)).map(|_| Octave::Down(1)),
+        seq!(repeat(1.., ','), _: not(normal_div_parser))
+            .try_map(|(s,): (Vec<char>,)| s.len().try_into())
+            .map(Octave::Down),
+        repeat(1.., '\'')
+            .try_map(|s: Vec<char>| s.len().try_into())
+            .map(Octave::Up),
     ))
     .parse_next(input)
 }
@@ -350,7 +354,7 @@ description: Hello World!";
     fn test_note_parsing() {
         let source = [
             "d", "r", "m", "f", "s", "l", "t", "d'", "r,", "m+2", "f-2", "ti", "da", "ri'", "ma,",
-            "si+1", "ra-3",
+            "si+1", "ra-3", "d,,", "r''",
         ];
 
         let notes = source

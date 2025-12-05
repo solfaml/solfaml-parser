@@ -138,4 +138,22 @@ expression: notes
             ),
         },
     ),
+    Ok(
+        Note {
+            base: D,
+            variant: Base,
+            octave: Down(
+                2,
+            ),
+        },
+    ),
+    Ok(
+        Note {
+            base: R,
+            variant: Base,
+            octave: Up(
+                2,
+            ),
+        },
+    ),
 ]
